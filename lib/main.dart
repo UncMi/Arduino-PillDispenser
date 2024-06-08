@@ -25,6 +25,7 @@ class _MyAppState extends State<MyApp> {
   Uint8List _data = Uint8List(0);
 
   bool _isRunning = false;
+  String _receivedData = "";
 
   void _startCycle() async {
     setState(() {
@@ -50,7 +51,6 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
-
   @override
   void initState() {
     super.initState();
@@ -63,6 +63,7 @@ class _MyAppState extends State<MyApp> {
     _bluetoothClassicPlugin.onDeviceDataReceived().listen((event) {
       setState(() {
         _data = Uint8List.fromList([..._data, ...event]);
+        _receivedData = String.fromCharCodes(_data);
       });
     });
   }
@@ -140,46 +141,42 @@ class _MyAppState extends State<MyApp> {
           child: Column(
             children: [
               Text("Device status is $_deviceStatus"),
-
-              Row( 
+              Row(
                 children: [
-                SizedBox(width: 40), 
-                TextButton(
-                onPressed: () async {
-                  await _bluetoothClassicPlugin.initPermissions();
-                },
-                child: const Text("Check Permissions"),
+                  SizedBox(width: 40),
+                  TextButton(
+                    onPressed: () async {
+                      await _bluetoothClassicPlugin.initPermissions();
+                    },
+                    child: const Text("Check Permissions"),
+                  ),
+                  TextButton(
+                    onPressed: _getDevices,
+                    child: const Text("Get Paired Devices"),
+                  ),
+                ],
               ),
-              TextButton(
-                onPressed: _getDevices,
-                child: const Text("Get Paired Devices"),
-              ),],),
-              
-              
-              Row(children: [
-                SizedBox(width: 87), 
-                TextButton(
-                onPressed: _deviceStatus == Device.connected
-                    ? () async {
-                        await _bluetoothClassicPlugin.disconnect();
-                      }
-                    : null,
-                child: const Text("Disconnect"),
+              Row(
+                children: [
+                  SizedBox(width: 87),
+                  TextButton(
+                    onPressed: _deviceStatus == Device.connected
+                        ? () async {
+                            await _bluetoothClassicPlugin.disconnect();
+                          }
+                        : null,
+                    child: const Text("Disconnect"),
+                  ),
+                  TextButton(
+                    onPressed: _deviceStatus == Device.connected
+                        ? () async {
+                            await _bluetoothClassicPlugin.write('s');
+                          }
+                        : null,
+                    child: const Text("Send Ping"),
+                  ),
+                ],
               ),
-              TextButton(
-                onPressed: _deviceStatus == Device.connected
-                    ? () async {
-                        await _bluetoothClassicPlugin.write('s');
-                      }
-                    : null,
-                child: const Text("Send Ping"),
-              ),
-
-              ],),
-              
-              // Center(
-              //   child: Text('Running on: $_platformVersion\n'),
-              // ),
               ...[
                 for (var device in _devices)
                   TextButton(
@@ -210,82 +207,91 @@ class _MyAppState extends State<MyApp> {
                   children: [
                     Column(
                       children: [
-                      TextButton(
-                      onPressed: _deviceStatus == Device.connected
-                          ? () async {
-                              await _bluetoothClassicPlugin.write('s');
-                            }
-                          : null,
-                      style: TextButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        foregroundColor: Colors.black, // Change text color to black
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10.0),
-                          side: BorderSide(color: Colors.blue),
-                        ),
-                        padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                      ),
-                      child: Text(
-                        "Section",
-                        style: TextStyle(
-                          color: _deviceStatus == Device.connected ? Colors.white : Colors.grey, // Change text color based on status
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 30),
-                    Row(
-                      children: [
-                      TextButton(
-                      onPressed: _deviceStatus == Device.connected && !_isRunning
-                        ? () async {
-                            _startCycle();
-                          }
-                        : null,
-                      style: TextButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.black, // Change text color to black
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10.0),
-                          side: BorderSide(color: Colors.green),
-                        ),
-                        padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                      ),
-                      child: Text(
-                          "Cycle Start",
-                          style: TextStyle(
-                            color: _deviceStatus == Device.connected ? Colors.white : Colors.grey, // Change text color based on status
+                        TextButton(
+                          onPressed: _deviceStatus == Device.connected
+                              ? () async {
+                                  await _bluetoothClassicPlugin.write('s');
+                                }
+                              : null,
+                          style: TextButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            foregroundColor: Colors.black, 
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10.0),
+                              side: BorderSide(color: Colors.blue),
+                            ),
+                            padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                          ),
+                          child: Text(
+                            "Section",
+                            style: TextStyle(
+                              color: _deviceStatus == Device.connected ? Colors.white : Colors.grey, 
+                            ),
                           ),
                         ),
-                      ),
-
-                      SizedBox(width: 30),
-                    TextButton(
-                       onPressed: _deviceStatus == Device.connected && _isRunning
-                        ? () async {
-                            _stopCycle();
-                          }
-                        : null,
-                      style: TextButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.black, // Change text color to black
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10.0),
-                          side: BorderSide(color: Colors.red),
-                        ),
-                        padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                      ),
-                      child: Text(
-                        "Cycle Stop",
-                        style: TextStyle(
-                          color: _deviceStatus == Device.connected ? Colors.white : Colors.grey, // Change text color based on status
-                        ),
-                      ),
-                    ),],)
-                    ],
+                        SizedBox(height: 30),
+                        Row(
+                          children: [
+                            TextButton(
+                              onPressed: _deviceStatus == Device.connected && !_isRunning
+                                  ? () async {
+                                      _startCycle();
+                                    }
+                                  : null,
+                              style: TextButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.black, 
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10.0),
+                                  side: BorderSide(color: Colors.green),
+                                ),
+                                padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                              ),
+                              child: Text(
+                                "Cycle Start",
+                                style: TextStyle(
+                                  color: _deviceStatus == Device.connected ? Colors.white : Colors.grey, 
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 30),
+                            TextButton(
+                              onPressed: _deviceStatus == Device.connected && _isRunning
+                                  ? () async {
+                                      _stopCycle();
+                                    }
+                                  : null,
+                              style: TextButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.black, 
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10.0),
+                                  side: BorderSide(color: Colors.red),
+                                ),
+                                padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                              ),
+                              child: Text(
+                                "Cycle Stop",
+                                style: TextStyle(
+                                  color: _deviceStatus == Device.connected ? Colors.white : Colors.grey, 
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      ],
                     ),
-                    
-                    
                   ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  "想說路: $_receivedData",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                  ),
                 ),
               ),
             ],
