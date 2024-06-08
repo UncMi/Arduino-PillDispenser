@@ -1,0 +1,107 @@
+import 'package:bluetooth_classic/models/device.dart';
+import 'package:flutter/material.dart';
+import 'dart:async';
+
+import 'package:flutter/services.dart';
+import 'package:bluetooth_classic/bluetooth_classic.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatefulWidget {
+  const MyApp({Key? key}) : super(key: key);
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  String _platformVersion = 'Unknown';
+  final _bluetoothClassicPlugin = BluetoothClassic();
+  List<Device> _devices = [];
+  int _deviceStatus = Device.disconnected;
+
+  @override
+  void initState() {
+    super.initState();
+    initPlatformState();
+    _bluetoothClassicPlugin.onDeviceStatusChanged().listen((event) {
+      setState(() {
+        _deviceStatus = event;
+      });
+    });
+  }
+
+  // Platform messages are asynchronous, so we initialize in an async method.
+  Future<void> initPlatformState() async {
+    String platformVersion;
+    // Platform messages may fail, so we use a try/catch PlatformException.
+    // We also handle the message potentially returning null.
+    try {
+      platformVersion = await _bluetoothClassicPlugin.getPlatformVersion() ??
+          'Unknown platform version';
+    } on PlatformException {
+      platformVersion = 'Failed to get platform version.';
+    }
+
+    // If the widget was removed from the tree while the asynchronous platform
+    // message was in flight, we want to discard the reply rather than calling
+    // setState to update our non-existent appearance.
+    if (!mounted) return;
+
+    setState(() {
+      _platformVersion = platformVersion;
+    });
+  }
+
+  Future<void> _getDevices() async {
+    var res = await _bluetoothClassicPlugin.getPairedDevices();
+    setState(() {
+      _devices = res;
+    });
+  }
+
+  Future<void> _sendDataToDevice(String deviceAddress) async {
+  // UUID for Serial Port Profile (SPP)
+  final String sppUuid = "00001101-0000-1000-8000-00805f9b34fb";
+
+  // Connect to the device
+  await _bluetoothClassicPlugin.connect(deviceAddress, sppUuid);
+
+  // Send data (in this case, the character 'S')
+  await _bluetoothClassicPlugin.write('s');
+}
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        appBar: AppBar(
+          title: const Text('Bluetooth Devices'),
+        ),
+        body: SingleChildScrollView(
+          child: Column(
+            children: [
+              Text("Device status is $_deviceStatus"),
+              TextButton(
+                onPressed: _getDevices,
+                child: const Text("Get Paired Devices"),
+              ),
+              Center(
+                child: Text('Running on: $_platformVersion\n'),
+              ),
+              ..._devices.map((device) => ListTile(
+                title: Text(device.name ?? device.address),
+                subtitle: Text(device.address),
+                trailing: IconButton(
+                  icon: Icon(Icons.bluetooth),
+                  onPressed: () => _sendDataToDevice(device.address),
+                ),
+              )),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

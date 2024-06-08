@@ -1,0 +1,249 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_blue/flutter_blue.dart';
+import 'package:permission_handler/permission_handler.dart';
+
+void main() {
+  runApp(MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: HomeScreen(),
+    );
+  }
+}
+
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({Key? key}) : super(key: key);
+
+  @override
+  _HomeScreenState createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  FlutterBlue flutterBlue = FlutterBlue.instance;
+  BluetoothDevice? connectedDevice;
+  BluetoothCharacteristic? characteristic;
+  String temperature = "N/A";
+  String connectionStatus = "Disconnected";
+
+  @override
+  void initState() {
+    super.initState();
+    checkPermissions();
+  }
+
+  Future<void> checkPermissions() async {
+    if (await _arePermissionsGranted()) {
+      startScan();
+    } else {
+      await requestPermissions();
+      if (await _arePermissionsGranted()) {
+        startScan();
+      } else {
+        setState(() {
+          connectionStatus = "Permissions Denied";
+        });
+      }
+    }
+  }
+
+  Future<void> requestPermissions() async {
+    Map<Permission, PermissionStatus> status = await [
+      Permission.location,
+      Permission.bluetooth,
+      Permission.bluetoothScan,
+      Permission.bluetoothConnect,
+    ].request();
+
+    if (status.values.any((element) => element.isDenied)) {
+      setState(() {
+        connectionStatus = "Permissions Denied";
+      });
+    } else if (status.values.every((element) => element.isGranted)) {
+      setState(() {
+        connectionStatus = "Permissions Granted";
+      });
+    }
+  }
+
+  Future<bool> _arePermissionsGranted() async {
+    var locationStatus = await Permission.location.status;
+    var bluetoothStatus = await Permission.bluetooth.status;
+    var bluetoothScanStatus = await Permission.bluetoothScan.status;
+    var bluetoothConnectStatus = await Permission.bluetoothConnect.status;
+
+    return locationStatus.isGranted &&
+        bluetoothStatus.isGranted &&
+        bluetoothScanStatus.isGranted &&
+        bluetoothConnectStatus.isGranted;
+  }
+
+  void startScan() {
+    setState(() {
+      connectionStatus = "Scanning for devices...";
+    });
+
+    flutterBlue.startScan(timeout: Duration(seconds: 4));
+
+    flutterBlue.scanResults.listen((results) {
+      for (ScanResult r in results) {
+        if (r.device.name == "HC-06") {
+          print('Device found: ${r.device.name}');
+          flutterBlue.stopScan();
+          connectToDevice(r.device);
+          break;
+        }
+      }
+    });
+  }
+
+  void connectToDevice(BluetoothDevice device) async {
+    if (!await _arePermissionsGranted()) {
+      await requestPermissions();
+      if (!await _arePermissionsGranted()) {
+        return;
+      }
+    }
+
+    try {
+      print('Attempting to connect to device: ${device.name}');
+      await device.connect();
+      setState(() {
+        connectedDevice = device;
+        connectionStatus = "Connected to ${device.name}";
+      });
+
+      print('Connected to device: ${device.name}');
+      discoverServices(device);
+    } catch (e) {
+      print('Error connecting to device: $e');
+      setState(() {
+        connectionStatus = "Connection Failed";
+      });
+    }
+  }
+
+  void discoverServices(BluetoothDevice device) async {
+    try {
+      List<BluetoothService> services = await device.discoverServices();
+      for (BluetoothService service in services) {
+        for (BluetoothCharacteristic c in service.characteristics) {
+          if (c.properties.notify) {
+            await c.setNotifyValue(true);
+            c.value.listen((value) {
+              String newTemp = String.fromCharCodes(value).trim();
+              print('New temperature value: $newTemp');
+              if (newTemp.startsWith("Temperature:")) {
+                setState(() {
+                  temperature = newTemp.split(":")[1].trim();
+                });
+              }
+            });
+            setState(() {
+              characteristic = c;
+            });
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      print('Error discovering services: $e');
+    }
+  }
+
+  void disconnectDevice() async {
+    if (connectedDevice != null) {
+      try {
+        await connectedDevice!.disconnect();
+        setState(() {
+          connectedDevice = null;
+          connectionStatus = "Disconnected";
+        });
+      } catch (e) {
+        print('Error disconnecting from device: $e');
+      }
+    }
+  }
+
+  Future<void> updateConnectionStatus() async {
+    if (await _arePermissionsGranted()) {
+      setState(() {
+        connectionStatus = connectedDevice != null
+            ? "Connected to ${connectedDevice!.name}"
+            : "Disconnected";
+      });
+    } else {
+      await requestPermissions();
+      setState(() async {
+        connectionStatus = await _arePermissionsGranted()
+            ? "Permissions Granted"
+            : "Permissions Denied";
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Color.fromARGB(255, 46, 53, 52),
+        title: const Text(
+          "Pill Dispenser",
+          style: TextStyle(
+            color: Colors.white,
+          ),
+        ),
+      ),
+      backgroundColor: Color.fromARGB(255, 76, 88, 87),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              "Connection Status: $connectionStatus",
+              style: TextStyle(color: Colors.white, fontSize: 24),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              "Current Temperature: $temperature °C",
+              style: TextStyle(color: Colors.white, fontSize: 24),
+            ),
+          ),
+          if (connectedDevice != null)
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  Text(
+                    "Connected Device: ${connectedDevice!.name}",
+                    style: TextStyle(color: Colors.white, fontSize: 24),
+                  ),
+                  ElevatedButton(
+                    onPressed: disconnectDevice,
+                    child: Text("Disconnect"),
+                  ),
+                ],
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: ElevatedButton(
+              onPressed: () async {
+                await updateConnectionStatus();
+              },
+              child: Text("Update Connection Status"),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
