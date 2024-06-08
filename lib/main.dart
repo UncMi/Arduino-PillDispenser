@@ -1,9 +1,8 @@
-import 'package:bluetooth_classic/models/device.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
-
 import 'package:flutter/services.dart';
 import 'package:bluetooth_classic/bluetooth_classic.dart';
+import 'package:bluetooth_classic/models/device.dart';
 
 void main() {
   runApp(const MyApp());
@@ -11,7 +10,7 @@ void main() {
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
-s
+
   @override
   State<MyApp> createState() => _MyAppState();
 }
@@ -24,6 +23,34 @@ class _MyAppState extends State<MyApp> {
   bool _scanning = false;
   int _deviceStatus = Device.disconnected;
   Uint8List _data = Uint8List(0);
+
+  bool _isRunning = false;
+
+  void _startCycle() async {
+    setState(() {
+      _isRunning = true;
+    });
+    for (int i = 0; i < 7; i++) {
+      if (!_isRunning) {
+        break;
+      }
+      await _bluetoothClassicPlugin.write('s');
+      if (i < 6 && _isRunning) {
+        await Future.delayed(Duration(seconds: 15));
+      }
+    }
+    setState(() {
+      _isRunning = false;
+    });
+  }
+
+  void _stopCycle() {
+    setState(() {
+      _isRunning = false;
+    });
+  }
+
+
   @override
   void initState() {
     super.initState();
@@ -40,21 +67,14 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
-  // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> initPlatformState() async {
     String platformVersion;
-    // Platform messages may fail, so we use a try/catch PlatformException.
-    // We also handle the message potentially returning null.
     try {
-      platformVersion = await _bluetoothClassicPlugin.getPlatformVersion() ??
-          'Unknown platform version';
+      platformVersion = await _bluetoothClassicPlugin.getPlatformVersion() ?? 'Unknown platform version';
     } on PlatformException {
       platformVersion = 'Failed to get platform version.';
     }
 
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
     if (!mounted) return;
 
     setState(() {
@@ -93,22 +113,38 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(
-        title: const Text(
-          "PillZapinator Connect",
-          style: TextStyle(
-            color: Colors.white,
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        primaryColor: Color.fromARGB(255, 46, 53, 52),
+        textTheme: TextTheme(
+          bodyText2: TextStyle(color: Colors.white),
+        ),
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(
+            primary: Colors.white,
           ),
         ),
-        backgroundColor: Color.fromARGB(255, 46, 53, 52),
       ),
-      backgroundColor: Color.fromARGB(255, 76, 88, 87),
+      home: Scaffold(
+        appBar: AppBar(
+          title: const Text(
+            "PillZapinator Connect",
+            style: TextStyle(
+              color: Colors.white,
+            ),
+          ),
+          backgroundColor: Color.fromARGB(255, 46, 53, 52),
+        ),
+        backgroundColor: Color.fromARGB(255, 76, 88, 87),
         body: SingleChildScrollView(
           child: Column(
             children: [
               Text("Device status is $_deviceStatus"),
-              TextButton(
+
+              Row( 
+                children: [
+                SizedBox(width: 40), 
+                TextButton(
                 onPressed: () async {
                   await _bluetoothClassicPlugin.initPermissions();
                 },
@@ -117,14 +153,18 @@ class _MyAppState extends State<MyApp> {
               TextButton(
                 onPressed: _getDevices,
                 child: const Text("Get Paired Devices"),
-              ),
-              TextButton(
+              ),],),
+              
+              
+              Row(children: [
+                SizedBox(width: 87), 
+                TextButton(
                 onPressed: _deviceStatus == Device.connected
                     ? () async {
                         await _bluetoothClassicPlugin.disconnect();
                       }
                     : null,
-                child: const Text("disconnect"),
+                child: const Text("Disconnect"),
               ),
               TextButton(
                 onPressed: _deviceStatus == Device.connected
@@ -132,23 +172,26 @@ class _MyAppState extends State<MyApp> {
                         await _bluetoothClassicPlugin.write('s');
                       }
                     : null,
-                child: const Text("send ping"),
+                child: const Text("Send Ping"),
               ),
-              Center(
-                child: Text('Running on: $_platformVersion\n'),
-              ),
+
+              ],),
+              
+              // Center(
+              //   child: Text('Running on: $_platformVersion\n'),
+              // ),
               ...[
                 for (var device in _devices)
                   TextButton(
-                      onPressed: () async {
-                        await _bluetoothClassicPlugin.connect(device.address,
-                            "00001101-0000-1000-8000-00805f9b34fb");
-                        setState(() {
-                          _discoveredDevices = [];
-                          _devices = [];
-                        });
-                      },
-                      child: Text(device.name ?? device.address))
+                    onPressed: () async {
+                      await _bluetoothClassicPlugin.connect(device.address, "00001101-0000-1000-8000-00805f9b34fb");
+                      setState(() {
+                        _discoveredDevices = [];
+                        _devices = [];
+                      });
+                    },
+                    child: Text(device.name ?? device.address),
+                  ),
               ],
               TextButton(
                 onPressed: _scan,
@@ -156,9 +199,95 @@ class _MyAppState extends State<MyApp> {
               ),
               ...[
                 for (var device in _discoveredDevices)
-                  Text(device.name ?? device.address)
+                  Text(device.name ?? device.address),
               ],
               Text("Received data: ${String.fromCharCodes(_data)}"),
+              SizedBox(height: 50),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    Column(
+                      children: [
+                      TextButton(
+                      onPressed: _deviceStatus == Device.connected
+                          ? () async {
+                              await _bluetoothClassicPlugin.write('s');
+                            }
+                          : null,
+                      style: TextButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.black, // Change text color to black
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10.0),
+                          side: BorderSide(color: Colors.blue),
+                        ),
+                        padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                      ),
+                      child: Text(
+                        "Section",
+                        style: TextStyle(
+                          color: _deviceStatus == Device.connected ? Colors.white : Colors.grey, // Change text color based on status
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 30),
+                    Row(
+                      children: [
+                      TextButton(
+                      onPressed: _deviceStatus == Device.connected && !_isRunning
+                        ? () async {
+                            _startCycle();
+                          }
+                        : null,
+                      style: TextButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.black, // Change text color to black
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10.0),
+                          side: BorderSide(color: Colors.green),
+                        ),
+                        padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                      ),
+                      child: Text(
+                          "Cycle Start",
+                          style: TextStyle(
+                            color: _deviceStatus == Device.connected ? Colors.white : Colors.grey, // Change text color based on status
+                          ),
+                        ),
+                      ),
+
+                      SizedBox(width: 30),
+                    TextButton(
+                       onPressed: _deviceStatus == Device.connected && _isRunning
+                        ? () async {
+                            _stopCycle();
+                          }
+                        : null,
+                      style: TextButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.black, // Change text color to black
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10.0),
+                          side: BorderSide(color: Colors.red),
+                        ),
+                        padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                      ),
+                      child: Text(
+                        "Cycle Stop",
+                        style: TextStyle(
+                          color: _deviceStatus == Device.connected ? Colors.white : Colors.grey, // Change text color based on status
+                        ),
+                      ),
+                    ),],)
+                    ],
+                    ),
+                    
+                    
+                  ],
+                ),
+              ),
             ],
           ),
         ),
