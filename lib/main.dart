@@ -1,3 +1,4 @@
+import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:flutter/services.dart';
@@ -5,6 +6,16 @@ import 'package:bluetooth_classic/bluetooth_classic.dart';
 import 'package:bluetooth_classic/models/device.dart';
 
 void main() {
+  AwesomeNotifications().initialize(
+    null,
+    [
+      NotificationChannel(
+          channelKey: "basic_channel",
+          channelName: "Basic notifications",
+          channelDescription: "Basic test notification channel"),
+    ],
+    debug: true,
+  );
   runApp(const MyApp());
 }
 
@@ -26,6 +37,22 @@ class _MyAppState extends State<MyApp> {
 
   bool _isRunning = false;
   String _receivedData = "";
+
+  final TextEditingController _controller1Hour = TextEditingController();
+  final TextEditingController _controller1Minute = TextEditingController();
+  final TextEditingController _controller1Second = TextEditingController();
+  final TextEditingController _controller2Hour = TextEditingController();
+  final TextEditingController _controller2Minute = TextEditingController();
+  final TextEditingController _controller2Second = TextEditingController();
+  final TextEditingController _controller3Hour = TextEditingController();
+  final TextEditingController _controller3Minute = TextEditingController();
+  final TextEditingController _controller3Second = TextEditingController();
+  final TextEditingController _controller4Hour = TextEditingController();
+  final TextEditingController _controller4Minute = TextEditingController();
+  final TextEditingController _controller4Second = TextEditingController();
+
+  List<String> _results = [];
+  String? _warningMessage;
 
   void _startCycle() async {
     setState(() {
@@ -51,9 +78,43 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
+  void _sendNotification() {
+    Future.delayed(Duration(seconds: 0), () {
+      AwesomeNotifications().createNotification(
+        content: NotificationContent(
+          id: 5,
+          channelKey: 'basic_channel',
+          title: 'Whoops',
+          body: 'your pills are messed up',
+          largeIcon: 'asset://assets/kek.png',
+        ),
+      );
+    });
+  }
+
+  void _sendNotificationDelayed() {
+    Future.delayed(Duration(seconds: 10), () {
+      AwesomeNotifications().createNotification(
+        content: NotificationContent(
+          id: 5,
+          channelKey: 'basic_channel',
+          title: 'Whoops',
+          body: 'your pills are messed up',
+          largeIcon: 'asset://assets/kek.png',
+        ),
+      );
+    });
+  }
+
   @override
   void initState() {
     super.initState();
+    AwesomeNotifications().isNotificationAllowed().then((isAllowed) {
+      if (!isAllowed) {
+        AwesomeNotifications().requestPermissionToSendNotifications();
+      }
+    });
+
     initPlatformState();
     _bluetoothClassicPlugin.onDeviceStatusChanged().listen((event) {
       setState(() {
@@ -62,7 +123,7 @@ class _MyAppState extends State<MyApp> {
     });
     _bluetoothClassicPlugin.onDeviceDataReceived().listen((event) {
       setState(() {
-        _data = Uint8List.fromList([..._data, ...event]);
+        _data = event;
         _receivedData = String.fromCharCodes(_data);
       });
     });
@@ -71,7 +132,8 @@ class _MyAppState extends State<MyApp> {
   Future<void> initPlatformState() async {
     String platformVersion;
     try {
-      platformVersion = await _bluetoothClassicPlugin.getPlatformVersion() ?? 'Unknown platform version';
+      platformVersion = await _bluetoothClassicPlugin.getPlatformVersion() ??
+          'Unknown platform version';
     } on PlatformException {
       platformVersion = 'Failed to get platform version.';
     }
@@ -108,6 +170,143 @@ class _MyAppState extends State<MyApp> {
       setState(() {
         _scanning = true;
       });
+    }
+  }
+
+  Widget buildTimeInputField(
+      TextEditingController hourController,
+      TextEditingController minuteController,
+      TextEditingController secondController,
+      String label) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          Expanded(
+            child: DropdownButtonFormField<int>(
+              value: int.tryParse(hourController.text),
+              decoration: InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: '$label Hour',
+              ),
+              items: List.generate(24, (index) => index)
+                  .map((hour) => DropdownMenuItem<int>(
+                        value: hour,
+                        child: Text(hour.toString().padLeft(2, '0')),
+                      ))
+                  .toList(),
+              onChanged: (value) {
+                hourController.text = value.toString();
+              },
+            ),
+          ),
+          SizedBox(width: 8),
+          Expanded(
+            child: DropdownButtonFormField<int>(
+              value: int.tryParse(minuteController.text),
+              decoration: InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: '$label Minute',
+              ),
+              items: List.generate(60, (index) => index)
+                  .map((minute) => DropdownMenuItem<int>(
+                        value: minute,
+                        child: Text(minute.toString().padLeft(2, '0')),
+                      ))
+                  .toList(),
+              onChanged: (value) {
+                minuteController.text = value.toString();
+              },
+            ),
+          ),
+          SizedBox(width: 8),
+          Expanded(
+            child: DropdownButtonFormField<int>(
+              value: int.tryParse(secondController.text),
+              decoration: InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: '$label Second',
+              ),
+              items: List.generate(60, (index) => index)
+                  .map((second) => DropdownMenuItem<int>(
+                        value: second,
+                        child: Text(second.toString().padLeft(2, '0')),
+                      ))
+                  .toList(),
+              onChanged: (value) {
+                secondController.text = value.toString();
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void calculateTimeDifferences() {
+  setState(() {
+    _results.clear();
+    _warningMessage = null;
+
+    // Parse the input times
+    List<DateTime?> times = [
+      parseTime(_controller1Hour.text, _controller1Minute.text, _controller1Second.text),
+      parseTime(_controller2Hour.text, _controller2Minute.text, _controller2Second.text),
+      parseTime(_controller3Hour.text, _controller3Minute.text, _controller3Second.text),
+      parseTime(_controller4Hour.text, _controller4Minute.text, _controller4Second.text),
+    ];
+
+    // Get the current time
+    DateTime now = DateTime.now();
+
+    // Check and remove invalid times
+    for (int i = 0; i < times.length; i++) {
+      for (int j = i + 1; j < times.length; j++) {
+        if (times[i] != null && times[j] != null && times[i]!.isAfter(times[j]!)) {
+          times[i] = null;
+          _warningMessage = 'Warning: Input ${i + 1} is later than Input ${j}';
+          break;
+        }
+      }
+    }
+
+    // Filter out null values
+    times = times.where((time) => time != null).toList();
+
+    // Add the difference between now and the first valid time
+    if (times.isNotEmpty && times[0] != null) {
+      _results.add('Difference between now and input 0: ${now.difference(times[0]!).inSeconds} seconds');
+    }
+
+    // Check differences between remaining valid times
+    for (int i = 0; i < times.length - 1; i++) {
+      if (times[i] != null && times[i + 1] != null) {
+        if (times[i]!.isAfter(times[i + 1]!)) {
+          _warningMessage = 'Warning: Input ${i + 1} is later than Input ${i + 2}';
+        } else {
+          _results.add('Difference between input ${i + 1} and input ${i + 2}: ${times[i + 1]!.difference(times[i]!).inSeconds} seconds');
+        }
+      }
+    }
+  });
+}
+
+  DateTime? parseTime(String hour, String minute, String second) {
+    if (hour.isEmpty || minute.isEmpty || second.isEmpty) return null;
+    try {
+      final now = DateTime.now();
+      final time = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        int.parse(hour),
+        int.parse(minute),
+        int.parse(second),
+      );
+      return time;
+    } catch (e) {
+      return null;
     }
   }
 
@@ -181,7 +380,8 @@ class _MyAppState extends State<MyApp> {
                 for (var device in _devices)
                   TextButton(
                     onPressed: () async {
-                      await _bluetoothClassicPlugin.connect(device.address, "00001101-0000-1000-8000-00805f9b34fb");
+                      await _bluetoothClassicPlugin.connect(device.address,
+                          "00001101-0000-1000-8000-00805f9b34fb");
                       setState(() {
                         _discoveredDevices = [];
                         _devices = [];
@@ -198,7 +398,7 @@ class _MyAppState extends State<MyApp> {
                 for (var device in _discoveredDevices)
                   Text(device.name ?? device.address),
               ],
-              Text("Received data: ${String.fromCharCodes(_data)}"),
+              Text("Received data: $_receivedData"),
               SizedBox(height: 50),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 10.0),
@@ -215,17 +415,20 @@ class _MyAppState extends State<MyApp> {
                               : null,
                           style: TextButton.styleFrom(
                             backgroundColor: Colors.blue,
-                            foregroundColor: Colors.black, 
+                            foregroundColor: Colors.black,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10.0),
                               side: BorderSide(color: Colors.blue),
                             ),
-                            padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 16.0, vertical: 12.0),
                           ),
                           child: Text(
                             "Section",
                             style: TextStyle(
-                              color: _deviceStatus == Device.connected ? Colors.white : Colors.grey, 
+                              color: _deviceStatus == Device.connected
+                                  ? Colors.white
+                                  : Colors.grey,
                             ),
                           ),
                         ),
@@ -233,47 +436,55 @@ class _MyAppState extends State<MyApp> {
                         Row(
                           children: [
                             TextButton(
-                              onPressed: _deviceStatus == Device.connected && !_isRunning
+                              onPressed: _deviceStatus == Device.connected &&
+                                      !_isRunning
                                   ? () async {
                                       _startCycle();
                                     }
                                   : null,
                               style: TextButton.styleFrom(
                                 backgroundColor: Colors.green,
-                                foregroundColor: Colors.black, 
+                                foregroundColor: Colors.black,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10.0),
                                   side: BorderSide(color: Colors.green),
                                 ),
-                                padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: 16.0, vertical: 12.0),
                               ),
                               child: Text(
                                 "Cycle Start",
                                 style: TextStyle(
-                                  color: _deviceStatus == Device.connected ? Colors.white : Colors.grey, 
+                                  color: _deviceStatus == Device.connected
+                                      ? Colors.white
+                                      : Colors.grey,
                                 ),
                               ),
                             ),
                             SizedBox(width: 30),
                             TextButton(
-                              onPressed: _deviceStatus == Device.connected && _isRunning
+                              onPressed: _deviceStatus == Device.connected &&
+                                      _isRunning
                                   ? () async {
                                       _stopCycle();
                                     }
                                   : null,
                               style: TextButton.styleFrom(
                                 backgroundColor: Colors.red,
-                                foregroundColor: Colors.black, 
+                                foregroundColor: Colors.black,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10.0),
                                   side: BorderSide(color: Colors.red),
                                 ),
-                                padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: 16.0, vertical: 12.0),
                               ),
                               child: Text(
                                 "Cycle Stop",
                                 style: TextStyle(
-                                  color: _deviceStatus == Device.connected ? Colors.white : Colors.grey, 
+                                  color: _deviceStatus == Device.connected
+                                      ? Colors.white
+                                      : Colors.grey,
                                 ),
                               ),
                             ),
@@ -287,13 +498,40 @@ class _MyAppState extends State<MyApp> {
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Text(
-                  "想說路: $_receivedData",
+                  "Data: $_receivedData",
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 16,
                   ),
                 ),
               ),
+              ElevatedButton(
+                onPressed: _sendNotification,
+                child: Text('Send Notification'),
+              ),
+              ElevatedButton(
+                onPressed: _sendNotificationDelayed,
+                child: Text('Send Notification with delay'),
+              ),
+              buildTimeInputField(_controller1Hour, _controller1Minute,
+                  _controller1Second, 'Input 1'),
+              buildTimeInputField(_controller2Hour, _controller2Minute,
+                  _controller2Second, 'Input 2'),
+              buildTimeInputField(_controller3Hour, _controller3Minute,
+                  _controller3Second, 'Input 3'),
+              buildTimeInputField(_controller4Hour, _controller4Minute,
+                  _controller4Second, 'Input 4'),
+              ElevatedButton(
+                onPressed: calculateTimeDifferences,
+                child: Text('Calculate Time Differences'),
+              ),
+              if (_results.isNotEmpty)
+                ..._results.map((result) => Text(result)),
+              if (_warningMessage != null)
+                Text(
+                  _warningMessage!,
+                  style: TextStyle(color: Colors.red),
+                ),
             ],
           ),
         ),
