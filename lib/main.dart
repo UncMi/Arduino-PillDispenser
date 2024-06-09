@@ -1,9 +1,12 @@
-import 'package:awesome_notifications/awesome_notifications.dart';
-import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:math';
+import 'dart:typed_data';
+
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:bluetooth_classic/bluetooth_classic.dart';
 import 'package:bluetooth_classic/models/device.dart';
+import 'package:awesome_notifications/awesome_notifications.dart';
 
 void main() {
   AwesomeNotifications().initialize(
@@ -20,7 +23,7 @@ void main() {
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({super.key});
+  const MyApp({Key? key}) : super(key: key);
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -38,21 +41,23 @@ class _MyAppState extends State<MyApp> {
   bool _isRunning = false;
   String _receivedData = "";
 
-  final TextEditingController _controller1Hour = TextEditingController();
-  final TextEditingController _controller1Minute = TextEditingController();
-  final TextEditingController _controller1Second = TextEditingController();
-  final TextEditingController _controller2Hour = TextEditingController();
-  final TextEditingController _controller2Minute = TextEditingController();
-  final TextEditingController _controller2Second = TextEditingController();
-  final TextEditingController _controller3Hour = TextEditingController();
-  final TextEditingController _controller3Minute = TextEditingController();
-  final TextEditingController _controller3Second = TextEditingController();
-  final TextEditingController _controller4Hour = TextEditingController();
-  final TextEditingController _controller4Minute = TextEditingController();
-  final TextEditingController _controller4Second = TextEditingController();
+  int _selectedHour1 = 0;
+  int _selectedMinute1 = 0;
+  int _selectedSecond1 = 0;
 
-  List<String> _results = [];
-  String? _warningMessage;
+  int _selectedHour2 = 0;
+  int _selectedMinute2 = 0;
+  int _selectedSecond2 = 0;
+
+  int _selectedHour3 = 0;
+  int _selectedMinute3 = 0;
+  int _selectedSecond3 = 0;
+
+  int _selectedHour4 = 0;
+  int _selectedMinute4 = 0;
+  int _selectedSecond4 = 0;
+
+  List<int> _timesInSeconds = [];
 
   void _startCycle() async {
     setState(() {
@@ -78,28 +83,29 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
-  void _sendNotification() {
+  void _sendNotificationPillReady() {
     Future.delayed(Duration(seconds: 0), () {
       AwesomeNotifications().createNotification(
         content: NotificationContent(
           id: 5,
           channelKey: 'basic_channel',
-          title: 'Whoops',
-          body: 'your pills are messed up',
+          title: 'Pills are ready',
+          body: 'Your pills have been dispensed.',
           largeIcon: 'asset://assets/kek.png',
         ),
       );
     });
   }
 
-  void _sendNotificationDelayed() {
-    Future.delayed(Duration(seconds: 10), () {
+  void _sendNotificationPillWarning() {
+    Future.delayed(Duration(seconds: 0), () {
       AwesomeNotifications().createNotification(
         content: NotificationContent(
           id: 5,
           channelKey: 'basic_channel',
-          title: 'Whoops',
-          body: 'your pills are messed up',
+          title: 'Non-Ideal Pill Conditions',
+          body:
+              'Please check the temperature and humidity values of the pillbox.',
           largeIcon: 'asset://assets/kek.png',
         ),
       );
@@ -125,6 +131,12 @@ class _MyAppState extends State<MyApp> {
       setState(() {
         _data = event;
         _receivedData = String.fromCharCodes(_data);
+
+        if (_receivedData == "n1") {
+          _sendNotificationPillReady();
+        } else if (_receivedData != "n2") {
+          _sendNotificationPillWarning();
+        }
       });
     });
   }
@@ -170,143 +182,6 @@ class _MyAppState extends State<MyApp> {
       setState(() {
         _scanning = true;
       });
-    }
-  }
-
-  Widget buildTimeInputField(
-      TextEditingController hourController,
-      TextEditingController minuteController,
-      TextEditingController secondController,
-      String label) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          Expanded(
-            child: DropdownButtonFormField<int>(
-              value: int.tryParse(hourController.text),
-              decoration: InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: '$label Hour',
-              ),
-              items: List.generate(24, (index) => index)
-                  .map((hour) => DropdownMenuItem<int>(
-                        value: hour,
-                        child: Text(hour.toString().padLeft(2, '0')),
-                      ))
-                  .toList(),
-              onChanged: (value) {
-                hourController.text = value.toString();
-              },
-            ),
-          ),
-          SizedBox(width: 8),
-          Expanded(
-            child: DropdownButtonFormField<int>(
-              value: int.tryParse(minuteController.text),
-              decoration: InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: '$label Minute',
-              ),
-              items: List.generate(60, (index) => index)
-                  .map((minute) => DropdownMenuItem<int>(
-                        value: minute,
-                        child: Text(minute.toString().padLeft(2, '0')),
-                      ))
-                  .toList(),
-              onChanged: (value) {
-                minuteController.text = value.toString();
-              },
-            ),
-          ),
-          SizedBox(width: 8),
-          Expanded(
-            child: DropdownButtonFormField<int>(
-              value: int.tryParse(secondController.text),
-              decoration: InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: '$label Second',
-              ),
-              items: List.generate(60, (index) => index)
-                  .map((second) => DropdownMenuItem<int>(
-                        value: second,
-                        child: Text(second.toString().padLeft(2, '0')),
-                      ))
-                  .toList(),
-              onChanged: (value) {
-                secondController.text = value.toString();
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void calculateTimeDifferences() {
-  setState(() {
-    _results.clear();
-    _warningMessage = null;
-
-    // Parse the input times
-    List<DateTime?> times = [
-      parseTime(_controller1Hour.text, _controller1Minute.text, _controller1Second.text),
-      parseTime(_controller2Hour.text, _controller2Minute.text, _controller2Second.text),
-      parseTime(_controller3Hour.text, _controller3Minute.text, _controller3Second.text),
-      parseTime(_controller4Hour.text, _controller4Minute.text, _controller4Second.text),
-    ];
-
-    // Get the current time
-    DateTime now = DateTime.now();
-
-    // Check and remove invalid times
-    for (int i = 0; i < times.length; i++) {
-      for (int j = i + 1; j < times.length; j++) {
-        if (times[i] != null && times[j] != null && times[i]!.isAfter(times[j]!)) {
-          times[i] = null;
-          _warningMessage = 'Warning: Input ${i + 1} is later than Input ${j}';
-          break;
-        }
-      }
-    }
-
-    // Filter out null values
-    times = times.where((time) => time != null).toList();
-
-    // Add the difference between now and the first valid time
-    if (times.isNotEmpty && times[0] != null) {
-      _results.add('Difference between now and input 0: ${now.difference(times[0]!).inSeconds} seconds');
-    }
-
-    // Check differences between remaining valid times
-    for (int i = 0; i < times.length - 1; i++) {
-      if (times[i] != null && times[i + 1] != null) {
-        if (times[i]!.isAfter(times[i + 1]!)) {
-          _warningMessage = 'Warning: Input ${i + 1} is later than Input ${i + 2}';
-        } else {
-          _results.add('Difference between input ${i + 1} and input ${i + 2}: ${times[i + 1]!.difference(times[i]!).inSeconds} seconds');
-        }
-      }
-    }
-  });
-}
-
-  DateTime? parseTime(String hour, String minute, String second) {
-    if (hour.isEmpty || minute.isEmpty || second.isEmpty) return null;
-    try {
-      final now = DateTime.now();
-      final time = DateTime(
-        now.year,
-        now.month,
-        now.day,
-        int.parse(hour),
-        int.parse(minute),
-        int.parse(second),
-      );
-      return time;
-    } catch (e) {
-      return null;
     }
   }
 
@@ -398,7 +273,8 @@ class _MyAppState extends State<MyApp> {
                 for (var device in _discoveredDevices)
                   Text(device.name ?? device.address),
               ],
-              Text("Received data: $_receivedData"),
+              if (_receivedData != "n1" && _receivedData != "n2")
+                Text("Received data: $_receivedData"),
               SizedBox(height: 50),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 10.0),
@@ -505,37 +381,276 @@ class _MyAppState extends State<MyApp> {
                   ),
                 ),
               ),
+
+              SizedBox(height: 20),
+              // First set of dropdowns
+              _buildTimeDropdowns(1),
+              SizedBox(height: 20),
+              // Second set of dropdowns
+              _buildTimeDropdowns(2),
+              SizedBox(height: 20),
+              // Third set of dropdowns
+              _buildTimeDropdowns(3),
+              SizedBox(height: 20),
+              // Fourth set of dropdowns
+              _buildTimeDropdowns(4),
+              SizedBox(height: 20),
               ElevatedButton(
-                onPressed: _sendNotification,
-                child: Text('Send Notification'),
-              ),
-              ElevatedButton(
-                onPressed: _sendNotificationDelayed,
-                child: Text('Send Notification with delay'),
-              ),
-              buildTimeInputField(_controller1Hour, _controller1Minute,
-                  _controller1Second, 'Input 1'),
-              buildTimeInputField(_controller2Hour, _controller2Minute,
-                  _controller2Second, 'Input 2'),
-              buildTimeInputField(_controller3Hour, _controller3Minute,
-                  _controller3Second, 'Input 3'),
-              buildTimeInputField(_controller4Hour, _controller4Minute,
-                  _controller4Second, 'Input 4'),
-              ElevatedButton(
-                onPressed: calculateTimeDifferences,
+                onPressed: _calculateTimes,
                 child: Text('Calculate Time Differences'),
               ),
-              if (_results.isNotEmpty)
-                ..._results.map((result) => Text(result)),
-              if (_warningMessage != null)
-                Text(
-                  _warningMessage!,
-                  style: TextStyle(color: Colors.red),
+              SizedBox(height: 20),
+              if (_timesInSeconds.isNotEmpty) ...[
+                for (var timeInSeconds in _timesInSeconds)
+                  Column(
+                    children: [
+                      Text(
+                          "Time difference: ${_formatTimeDifference(timeInSeconds)}"),
+                    ],
+                  )
+              ],
+
+              if (_timesInSeconds.isNotEmpty) ...[
+                Container(
+                  child: Column(
+                    children: [
+                      // Create a function to build the concatenated text
+                      _buildConcatenatedText(),
+                    ],
+                  ),
                 ),
+              ],
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildConcatenatedText() {
+    String concatenatedText = '';
+    for (int index = 0; index < _timesInSeconds.length; index++) {
+      concatenatedText +=
+          "p$index${_formatMilliseconds(_timesInSeconds[index] * 1000)} ";
+    }
+    print(concatenatedText);
+    return Text(concatenatedText);
+  }
+
+  Widget _buildTimeDropdowns(int setNumber) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: <Widget>[
+        // Hour dropdown
+        DropdownButton<int>(
+          value: _getSelectedHour(setNumber),
+          onChanged: (int? newValue) {
+            setState(() {
+              _setSelectedHour(setNumber, newValue!);
+            });
+          },
+          items: List<DropdownMenuItem<int>>.generate(24, (int index) {
+            return DropdownMenuItem<int>(
+              value: index,
+              child: Text('$index'),
+            );
+          }),
+        ),
+        SizedBox(width: 10),
+        Text(':'),
+        SizedBox(width: 10),
+        // Minute dropdown
+        DropdownButton<int>(
+          value: _getSelectedMinute(setNumber),
+          onChanged: (int? newValue) {
+            setState(() {
+              _setSelectedMinute(setNumber, newValue!);
+            });
+          },
+          items: List<DropdownMenuItem<int>>.generate(60, (int index) {
+            return DropdownMenuItem<int>(
+              value: index,
+              child: Text('$index'),
+            );
+          }),
+        ),
+        SizedBox(width: 10),
+        Text(':'),
+        SizedBox(width: 10),
+        // Second dropdown
+        DropdownButton<int>(
+          value: _getSelectedSecond(setNumber),
+          onChanged: (int? newValue) {
+            setState(() {
+              _setSelectedSecond(setNumber, newValue!);
+            });
+          },
+          items: List<DropdownMenuItem<int>>.generate(60, (int index) {
+            return DropdownMenuItem<int>(
+              value: index,
+              child: Text('$index'),
+            );
+          }),
+        ),
+        SizedBox(width: 10),
+        // Label for the set
+        Text(
+          'Set $setNumber',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+      ],
+    );
+  }
+
+  int _getSelectedHour(int setNumber) {
+    switch (setNumber) {
+      case 1:
+        return _selectedHour1;
+      case 2:
+        return _selectedHour2;
+      case 3:
+        return _selectedHour3;
+      case 4:
+        return _selectedHour4;
+      default:
+        return 0;
+    }
+  }
+
+  int _getSelectedMinute(int setNumber) {
+    switch (setNumber) {
+      case 1:
+        return _selectedMinute1;
+      case 2:
+        return _selectedMinute2;
+      case 3:
+        return _selectedMinute3;
+      case 4:
+        return _selectedMinute4;
+      default:
+        return 0;
+    }
+  }
+
+  int _getSelectedSecond(int setNumber) {
+    switch (setNumber) {
+      case 1:
+        return _selectedSecond1;
+      case 2:
+        return _selectedSecond2;
+      case 3:
+        return _selectedSecond3;
+      case 4:
+        return _selectedSecond4;
+      default:
+        return 0;
+    }
+  }
+
+  void _setSelectedHour(int setNumber, int value) {
+    switch (setNumber) {
+      case 1:
+        _selectedHour1 = value;
+        break;
+      case 2:
+        _selectedHour2 = value;
+        break;
+      case 3:
+        _selectedHour3 = value;
+        break;
+      case 4:
+        _selectedHour4 = value;
+        break;
+      default:
+    }
+  }
+
+  void _setSelectedMinute(int setNumber, int value) {
+    switch (setNumber) {
+      case 1:
+        _selectedMinute1 = value;
+        break;
+      case 2:
+        _selectedMinute2 = value;
+        break;
+      case 3:
+        _selectedMinute3 = value;
+        break;
+      case 4:
+        _selectedMinute4 = value;
+        break;
+      default:
+    }
+  }
+
+  void _setSelectedSecond(int setNumber, int value) {
+    switch (setNumber) {
+      case 1:
+        _selectedSecond1 = value;
+        break;
+      case 2:
+        _selectedSecond2 = value;
+        break;
+      case 3:
+        _selectedSecond3 = value;
+        break;
+      case 4:
+        _selectedSecond4 = value;
+        break;
+      default:
+    }
+  }
+
+  void _calculateTimes() {
+    final now = DateTime.now();
+
+    final selectedTimes = [
+      DateTime(now.year, now.month, now.day, _selectedHour1, _selectedMinute1,
+          _selectedSecond1),
+      DateTime(now.year, now.month, now.day, _selectedHour2, _selectedMinute2,
+          _selectedSecond2),
+      DateTime(now.year, now.month, now.day, _selectedHour3, _selectedMinute3,
+          _selectedSecond3),
+      DateTime(now.year, now.month, now.day, _selectedHour4, _selectedMinute4,
+          _selectedSecond4),
+    ];
+
+    _timesInSeconds = selectedTimes.map((time) {
+      if (time.isBefore(now)) {
+        time = time.add(Duration(days: 1));
+      }
+      return time.difference(now).inSeconds;
+    }).toList();
+
+    _timesInSeconds.sort();
+
+    setState(() {});
+
+    _sendConcatenatedTextToDevice();
+  }
+
+  String _formatTimeDifference(int seconds) {
+    final hours = seconds ~/ 3600;
+    final minutes = (seconds % 3600) ~/ 60;
+    final remainingSeconds = seconds % 60;
+    return '$hours hours, $minutes minutes, $remainingSeconds seconds';
+  }
+
+  String _formatMilliseconds(int milliseconds) {
+    final seconds = milliseconds ~/ 1000;
+    final remainingMilliseconds = milliseconds % 1000;
+    return '$milliseconds';
+  }
+
+  void _sendConcatenatedTextToDevice() async {
+    // Build the concatenated text
+    String concatenatedText = '';
+    for (int index = 0; index < _timesInSeconds.length; index++) {
+      concatenatedText +=
+          "p$index${_formatMilliseconds(_timesInSeconds[index] * 1000)} ";
+    }
+
+    print(concatenatedText);
+    await _bluetoothClassicPlugin.write(concatenatedText);
   }
 }
