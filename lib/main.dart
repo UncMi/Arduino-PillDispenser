@@ -16,6 +16,10 @@ void main() {
           channelKey: "basic_channel",
           channelName: "Basic notifications",
           channelDescription: "Basic test notification channel"),
+      NotificationChannel(
+          channelKey: "greater_channel",
+          channelName: "Greater notifications",
+          channelDescription: "Notification channel for warnings"),
     ],
     debug: true,
   );
@@ -28,6 +32,14 @@ class MyApp extends StatefulWidget {
   @override
   State<MyApp> createState() => _MyAppState();
 }
+
+String _lastReceivedData = '';
+bool _notificationSent = false;
+bool _pillReadyNotificationSent = false;
+bool _pillWarningNotificationSent = false;
+
+final RegExp _floatingPointRegExp = RegExp(r'^\d*\.?\d*$');
+final _floatingPointFormatter = FilteringTextInputFormatter.allow(_floatingPointRegExp);
 
 class _MyAppState extends State<MyApp> {
   String _platformVersion = 'Unknown';
@@ -58,6 +70,13 @@ class _MyAppState extends State<MyApp> {
   int _selectedSecond4 = 0;
 
   List<int> _timesInSeconds = [];
+
+  final TextEditingController _cycleController = TextEditingController();
+  final TextEditingController _humidityController = TextEditingController();
+  final TextEditingController _temperatureController = TextEditingController();
+
+  
+
 
   void _startCycle() async {
     setState(() {
@@ -101,8 +120,8 @@ class _MyAppState extends State<MyApp> {
     Future.delayed(Duration(seconds: 0), () {
       AwesomeNotifications().createNotification(
         content: NotificationContent(
-          id: 5,
-          channelKey: 'basic_channel',
+          id: 6,
+          channelKey: 'greater_channel',
           title: 'Non-Ideal Pill Conditions',
           body:
               'Please check the temperature and humidity values of the pillbox.',
@@ -132,9 +151,9 @@ class _MyAppState extends State<MyApp> {
         _data = event;
         _receivedData = String.fromCharCodes(_data);
 
-        if (_receivedData == "n1") {
+        if (_receivedData.contains("n1")) {
           _sendNotificationPillReady();
-        } else if (_receivedData != "n2") {
+        } else if (_receivedData.contains("n2")) {
           _sendNotificationPillWarning();
         }
       });
@@ -203,7 +222,7 @@ class _MyAppState extends State<MyApp> {
       home: Scaffold(
         appBar: AppBar(
           title: const Text(
-            "PillZapinator Connect",
+            "Pill Dispense-matic App",
             style: TextStyle(
               color: Colors.white,
             ),
@@ -290,7 +309,7 @@ class _MyAppState extends State<MyApp> {
                                 }
                               : null,
                           style: TextButton.styleFrom(
-                            backgroundColor: Colors.blue,
+                            backgroundColor: Colors.yellow,
                             foregroundColor: Colors.black,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10.0),
@@ -300,7 +319,7 @@ class _MyAppState extends State<MyApp> {
                                 horizontal: 16.0, vertical: 12.0),
                           ),
                           child: Text(
-                            "Section",
+                            "Dispense",
                             style: TextStyle(
                               color: _deviceStatus == Device.connected
                                   ? Colors.white
@@ -309,44 +328,35 @@ class _MyAppState extends State<MyApp> {
                           ),
                         ),
                         SizedBox(height: 30),
+                        
+                        SizedBox(height: 30),
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
-                            TextButton(
-                              onPressed: _deviceStatus == Device.connected &&
-                                      !_isRunning
-                                  ? () async {
-                                      _startCycle();
-                                    }
-                                  : null,
-                              style: TextButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                foregroundColor: Colors.black,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10.0),
-                                  side: BorderSide(color: Colors.green),
+                            SizedBox(
+                              width: 100,
+                              child: TextField(
+                                controller: _cycleController,
+                                decoration: InputDecoration(
+                                  border: OutlineInputBorder(),
+                                  contentPadding: EdgeInsets.symmetric(
+                                      vertical: 10, horizontal: 8),
                                 ),
-                                padding: EdgeInsets.symmetric(
-                                    horizontal: 16.0, vertical: 12.0),
-                              ),
-                              child: Text(
-                                "Cycle Start",
-                                style: TextStyle(
-                                  color: _deviceStatus == Device.connected
-                                      ? Colors.white
-                                      : Colors.grey,
-                                ),
+                                keyboardType: TextInputType.numberWithOptions(decimal: true), // Enable decimal input
+                              inputFormatters: <TextInputFormatter>[
+                                _floatingPointFormatter,
+                              ],
                               ),
                             ),
                             SizedBox(width: 30),
                             TextButton(
-                              onPressed: _deviceStatus == Device.connected &&
-                                      _isRunning
+                              onPressed: _deviceStatus == Device.connected 
                                   ? () async {
-                                      _stopCycle();
+                                      _intervalSection();
                                     }
                                   : null,
                               style: TextButton.styleFrom(
-                                backgroundColor: Colors.red,
+                                backgroundColor: Colors.pink,
                                 foregroundColor: Colors.black,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10.0),
@@ -356,7 +366,7 @@ class _MyAppState extends State<MyApp> {
                                     horizontal: 16.0, vertical: 12.0),
                               ),
                               child: Text(
-                                "Cycle Stop",
+                                "Intervals",
                                 style: TextStyle(
                                   color: _deviceStatus == Device.connected
                                       ? Colors.white
@@ -365,7 +375,7 @@ class _MyAppState extends State<MyApp> {
                               ),
                             ),
                           ],
-                        )
+                        ),
                       ],
                     ),
                   ],
@@ -382,6 +392,92 @@ class _MyAppState extends State<MyApp> {
                 ),
               ),
 
+              SizedBox(height: 20), // Space between buttons and new widgets
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  Text(
+                    "Max Humidity:  ",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(
+                    width: 100,
+                    child: TextField(
+                      controller: _humidityController,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(),
+                        contentPadding:
+                            EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                      ),
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      sendHumidityToDevice();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      primary: Colors.blue,
+                      onPrimary: Colors.white,
+                      padding: EdgeInsets.symmetric(
+                          horizontal: 16.0, vertical: 12.0),
+                      textStyle:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    child: Text("Submit"),
+                  ),
+                ],
+              ),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  Text(
+                    "Max Temp (C*):",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(
+                    width: 100,
+                    child: TextField(
+                      controller: _temperatureController,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(),
+                        contentPadding:
+                            EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                      ),
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      sendTemperatureToDevice();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      primary: Colors.blue,
+                      onPrimary: Colors.white,
+                      padding: EdgeInsets.symmetric(
+                          horizontal: 16.0, vertical: 12.0),
+                      textStyle:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    child: Text("Submit"),
+                  ),
+                ],
+              ),
+              SizedBox(height:20),
+              ElevatedButton(
+                    onPressed: () {
+                      _resetBlink();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      primary: Colors.blue,
+                      onPrimary: Colors.white,
+                      padding: EdgeInsets.symmetric(
+                          horizontal: 16.0, vertical: 12.0),
+                      textStyle:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    child: Text("Restart Humidity/Temp Controller"),
+                  ),
+
               SizedBox(height: 20),
               // First set of dropdowns
               _buildTimeDropdowns(1),
@@ -397,7 +493,7 @@ class _MyAppState extends State<MyApp> {
               SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _calculateTimes,
-                child: Text('Calculate Time Differences'),
+                child: Text('Set Dispense Times'),
               ),
               SizedBox(height: 20),
               if (_timesInSeconds.isNotEmpty) ...[
@@ -477,7 +573,6 @@ class _MyAppState extends State<MyApp> {
         SizedBox(width: 10),
         Text(':'),
         SizedBox(width: 10),
-        // Second dropdown
         DropdownButton<int>(
           value: _getSelectedSecond(setNumber),
           onChanged: (int? newValue) {
@@ -629,6 +724,16 @@ class _MyAppState extends State<MyApp> {
     _sendConcatenatedTextToDevice();
   }
 
+  void sendHumidityToDevice() async {
+    String humidityText = "h${_humidityController.text}";
+    await _bluetoothClassicPlugin.write(humidityText);
+  }
+
+  void sendTemperatureToDevice() async {
+    String temperatureText = "t${_temperatureController.text}";
+    await _bluetoothClassicPlugin.write(temperatureText);
+  }
+
   String _formatTimeDifference(int seconds) {
     final hours = seconds ~/ 3600;
     final minutes = (seconds % 3600) ~/ 60;
@@ -643,14 +748,25 @@ class _MyAppState extends State<MyApp> {
   }
 
   void _sendConcatenatedTextToDevice() async {
-    // Build the concatenated text
-    String concatenatedText = '';
     for (int index = 0; index < _timesInSeconds.length; index++) {
-      concatenatedText +=
-          "p$index${_formatMilliseconds(_timesInSeconds[index] * 1000)} ";
+      String lastSent =
+          "p$index${_formatMilliseconds(_timesInSeconds[index] * 1000)}\n";
+      await _bluetoothClassicPlugin.write(lastSent);
     }
 
-    print(concatenatedText);
-    await _bluetoothClassicPlugin.write(concatenatedText);
+    await _bluetoothClassicPlugin.write("o");
+  }
+
+
+  void _intervalSection() async {
+  String temperature = "i${_cycleController.text}";
+
+  await _bluetoothClassicPlugin.write(temperature);
+  }
+
+  void _resetBlink() async {
+ 
+
+  await _bluetoothClassicPlugin.write("y");
   }
 }
